@@ -1,44 +1,98 @@
-# Attendance — Android app
+# Attendance
 
-Your existing app, wrapped as a real Android app with:
-- **Background reminders** via Capacitor Local Notifications. Android schedules upcoming reminders natively, so they can fire with the app closed.
-- **Home screen widget** via a native Android `AppWidgetProvider` (overall % + up to 4 subjects, tap to open the app).
-- The Android widget reads a small snapshot stored locally on the phone; it does not need the Netlify sync endpoint.
-- Attendance date keys use the device's local calendar date.
+A local-first attendance tracker for students, packaged as a PWA and an Android app with
+[Capacitor](https://capacitorjs.com/). It answers one question well: **how many classes can I
+skip, or how many do I need to attend, to stay above my target?**
 
-## Easiest way to get the APK (no installs, free)
-1. Make a free account at github.com and create a **new repository** (private is fine).
-2. Click **Add file -> Upload files**, drag in everything from this folder, commit.
-   - The `.github` folder is hidden on some phones/PCs. If it didn't upload: **Add file -> Create new file**,
-     name it `.github/workflows/build-apk.yml`, and paste in the contents of that file.
-3. Open the **Actions** tab -> "Build Android APK" runs automatically (~5-8 min).
-   If it doesn't, click it -> **Run workflow**.
-4. When it's green, open the run -> **Artifacts -> attendance-apk** -> download, unzip, copy `app-debug.apk` to your phone and install
-   (allow "Install unknown apps" when asked).
+Everything is stored on-device. There is no account, server, tracking, or analytics.
 
-## Moving your existing data
-Old data lives inside the browser/PWA, not in the app. In the **old** app: Settings -> Export JSON.
-In the **new** app: Settings -> Import data from file.
+## Features
 
-## Using it
-- Reminders: Settings -> Reminders -> On (allow notifications when Android asks). The app schedules up to 14 future local-date reminders and skips today if attendance is already logged. The schedule is refreshed when the app opens, when reminder settings change, and when attendance is saved. Android/OEM battery management can still delay delivery; on OPPO, set app battery usage to **Allow background activity / Unrestricted** and allow auto-launch if that option is present.
-- Widget: long-press the home screen -> Widgets -> Attendance. It refreshes after attendance/settings changes and when the app returns to the foreground. Android launchers control their own refresh cadence.
-- Widget: long-press home screen -> Widgets -> Attendance.
+- Per-subject attendance with a configurable target percentage.
+- "Can skip / must attend" math shown front and center.
+- Swipe a subject card left to mark present, right to mark absent; buttons work too.
+- Backfill past dates and edit/remove individual marks.
+- Stats: trend graph, 84-day heatmap, weekly recap with a shareable image, day log, reordering.
+- Reminders via Android Local Notifications (or Web Notifications in the browser).
+- Native Android home-screen widget (overall % + up to 4 subjects).
+- Export/import JSON, CSV, PDF, and Excel. On Android these are written to app storage and
+  opened through the system share sheet; on the web they download normally.
+- Light/dark themes with multiple UI styles and accent colors.
 
-## Build status and limitations
-This folder is a source project, not a prebuilt APK. The APK must be produced by a successful Android Gradle build. The GitHub Actions workflow builds a **debug APK** for personal installation; it is not Play Store-signed. Notifications are scheduled for the next 14 days when the app runs and are not a guarantee of exact-to-the-minute delivery. Reopen the app periodically so the rolling schedule is replenished after the initial window. A device reboot / force-stop can affect scheduled delivery depending on Android and OEM behavior.
+## Install the Android APK
 
-## Building locally instead
-Needs Node 20, JDK 17, Android SDK (including platform/build-tools):
-```
-pip install pillow && npm install
+1. Open the **Actions** tab and wait for the **Build Android APK** workflow.
+2. Open the latest green run and download the **attendance-apk** artifact.
+3. Unzip it and copy `app-debug.apk` to your phone, then install it (allow "Install unknown
+   apps" when asked).
+
+The workflow runs automatically on every push. You can also trigger it manually with
+**Run workflow**.
+
+### App updates and signing
+
+The APK is signed with the debug keystore committed at `keystore/debug.keystore` (alias
+`androiddebugkey`, password `android`). This makes every CI build use the **same** signing key,
+so new debug APKs install over old ones. It is a debug key for personal use only - replace it
+with your own private release keystore before publishing anywhere.
+
+If you lose local data: the app stores data in the WebView's local storage. Export a JSON
+backup before uninstalling. Uninstalling always deletes app data.
+
+## Build locally
+
+Requirements: Node 20+, JDK 17, Android SDK with a platform and build-tools, and Python 3
+with Pillow.
+
+```bash
+npm ci                    # installs deps + vendors jsPDF/SheetJS into www/vendor
 npx cap add android
 python3 scripts/patch_android.py
 npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
-APK: `android/app/build/outputs/apk/debug/app-debug.apk`
 
-## Editing the app later
-Edit `www/index.html`, push to GitHub, download the new APK. Keep the debug APK signing the same machine/workflow if you want updates
-to install over the old one (debug keys differ between machines — if install says "conflict", uninstall first, after exporting your data).
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+To preview the web app, serve the `www/` directory with any static server. It is a single-page
+app with no build step.
+
+## Data and privacy
+
+- Attendance data lives in `localStorage` inside the app/WebView and never leaves the device.
+- The app does not contact any backend and sends no analytics. The only optional network
+  request is the Google Fonts stylesheet; offline it falls back to system fonts. All export
+  libraries (jsPDF, SheetJS) are bundled locally, not loaded from a CDN.
+- Backups are user-initiated files. Treat an exported JSON backup as personal data.
+
+## Known limitations
+
+- The APK is a debug build, not Play Store-signed or Play Store-ready.
+- Reminder delivery depends on Android/OEM battery management. On aggressive OEMs (for
+  example OPPO/Realme), set battery usage to **Unrestricted** and allow auto-launch.
+- Reminders are scheduled for a rolling 14-day window when the app runs. Reopen the app
+  periodically to replenish the window. A force-stop or reboot can affect pending deliveries.
+- The launcher controls widget refresh cadence; the widget also refreshes when the app writes data.
+- The UI is one large `www/index.html` file. It works, but it is the main thing to refactor if
+  you want to contribute substantially.
+
+## Project layout
+
+```
+www/                  single-page web app (HTML/CSS/JS) + icons
+  vendor/             generated at install time (jsPDF, SheetJS) - not committed
+overlay/              native Android sources/resources copied into the Capacitor project
+scripts/patch_android.py   injects widget, permissions, and icons after `cap add android`
+scripts/vendor_libs.js      copies offline JS libs into www/vendor
+keystore/debug.keystore     stable debug signing key (personal use only)
+.github/workflows/    CI that builds the debug APK
+```
+
+## Contributing
+
+Issues and pull requests are welcome. Keep changes focused, test on a real Android device when
+touching the native widget or notifications, and export a backup before testing import/export.
+
+## License
+
+MIT - see [LICENSE](LICENSE).

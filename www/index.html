@@ -909,29 +909,8 @@ select{ width:100%; padding:12px; border-radius:14px; border:1px solid rgba(255,
     <div class="settings-group" id="widgetGroup">
       <div class="settings-group-title">Home Screen Widget</div>
       <div class="card settings-block">
-        <h3>Widget sync<span class="current-val" id="curWidgetSync">Off</span></h3>
-        <p class="h3-sub">A real OS widget can't read this app's storage directly, so this pushes a small, anonymous snapshot (your overall % and subject %s only — no attendance history) to a tiny sync endpoint that a widget-builder app on your phone can read. Treat the link below like a private URL.</p>
-        <div class="color-mode-row">
-          <div class="mode-chip reminder-chip" id="widgetSyncOffChip" tabindex="0">Off</div>
-          <div class="mode-chip reminder-chip" id="widgetSyncOnChip" tabindex="0">On</div>
-        </div>
-        <div id="widgetSyncDetails" style="display:none; margin-top:14px;">
-          <div class="setting-label" style="margin-top:0;"><span>Your sync URL</span></div>
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <input type="text" id="widgetSyncUrl" readonly style="margin-bottom:0; font-size:11px;">
-            <button class="icon-btn" id="widgetSyncCopy" type="button" aria-label="Copy sync URL" style="flex-shrink:0;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-          </div>
-          <button class="util-btn" id="widgetSyncRegen" style="margin-bottom:14px;">🔄 Generate a new link</button>
-
-          <div class="setting-label" style="margin-top:0;"><span>iPhone (Scriptable app)</span></div>
-          <p style="font-size:12px; opacity:0.6; margin:0 0 8px; line-height:1.5;">Install the free <b>Scriptable</b> app, create a new script, paste the code below, then long-press your home screen → Add Widget → Scriptable → pick this script.</p>
-          <button class="util-btn" id="widgetSyncCopyScript" style="margin-bottom:14px;">📋 Copy Scriptable script</button>
-
-          <div class="setting-label" style="margin-top:0;"><span>Android (KWGT / Tasker)</span></div>
-          <p style="font-size:12px; opacity:0.6; margin:0 0 4px; line-height:1.5;">In <b>KWGT</b> (free on Play Store), add a Text or Shape module → Text From → Web (JSON) → paste your sync URL above → set the field path to <code>overallPct</code>. Tasker's HTTP Request + JSON action works the same way.</p>
-        </div>
+        <h3>Attendance widget</h3>
+        <p class="h3-sub">In the Android app, long-press an empty spot on your home screen &rarr; <b>Widgets</b> &rarr; <b>Attendance</b>. It refreshes automatically whenever you mark a class.</p>
       </div>
     </div>
 
@@ -979,7 +958,7 @@ select{ width:100%; padding:12px; border-radius:14px; border:1px solid rgba(255,
   <div class="sheet card">
     <h3>New subject</h3>
     <input type="text" id="newSubjectName" placeholder="e.g. Engineering Mathematics">
-    <input type="number" id="newSubjectTarget" placeholder="Target attendance %" value="75">
+    <input type="number" id="newSubjectTarget" placeholder="Target attendance %" value="75" min="1" max="99" step="1" inputmode="numeric">
     <div class="setting-label" style="margin-top:2px;"><span>Classes attended / total classes (optional)</span></div>
     <div style="display:flex; gap:10px; margin-bottom:12px;">
       <input type="number" id="newSubjectPresent" placeholder="Present" min="0" style="margin-bottom:0;">
@@ -1057,7 +1036,7 @@ select{ width:100%; padding:12px; border-radius:14px; border:1px solid rgba(255,
   <div class="sheet card">
     <h3>Edit subject</h3>
     <input type="text" id="editSubjectName" placeholder="Subject name">
-    <input type="number" id="editSubjectTarget" placeholder="Target attendance %">
+    <input type="number" id="editSubjectTarget" placeholder="Target attendance %" min="1" max="99" step="1" inputmode="numeric">
     <div class="setting-label" style="margin-top:2px;"><span>Classes attended / total classes</span></div>
     <div style="display:flex; gap:10px; margin-bottom:12px;">
       <input type="number" id="editPresentCount" placeholder="Present" min="0" style="margin-bottom:0;">
@@ -1170,8 +1149,8 @@ select{ width:100%; padding:12px; border-radius:14px; border:1px solid rgba(255,
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
 <script>
 const STORE_KEY = 'attend_data_v4';
 const SETTINGS_KEY = 'attend_settings_v4';
@@ -1186,11 +1165,10 @@ const accents = [
 ];
 const subjectPresetColors = ['#7aa2ff','#ba78ff','#6edc96','#ff9f5a','#ff78aa','#ff6e6e','#5ad1d1','#f5d76e'];
 
-let state = load(STORE_KEY, { subjects: [] });
+let state = normalizeState(load(STORE_KEY, { subjects: [] }));
 let settings = load(SETTINGS_KEY, {
   ui:'skeu', skeuTone:'light', glass:55, colorMode:'preset', accent:'red', customColor:'#ff6e6e',
   wallpaper:null, wallpaperOpacity:100, fontStyle:'default', reminderEnabled:false, reminderTime:'18:00', lastReminderFired:null,
-  widgetSyncEnabled:false, widgetSyncId:null,
   glyph:{ preset:'streak', color:'accent', customPattern:[], text:{ value:'', style:'block' } }
 });
 if(!settings.glyph || !('color' in settings.glyph)) settings.glyph = { preset: (settings.glyph && settings.glyph.preset) || 'streak', color:'accent', customPattern:[], text:{ value:'', style:'block' } };
@@ -1204,9 +1182,49 @@ function load(key, fallback){
   catch(e){ return fallback; }
 }
 function save(){
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  if(typeof pushWidgetSync === 'function') pushWidgetSync();
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }catch(e){ showToast('Storage is full — export a backup'); }
+  if(typeof window.pushWidgetSync === 'function') window.pushWidgetSync();
+}
+/* Keep a valid, minimal target so percentage math never divides by zero. */
+function clampTarget(v, fallback){
+  const n = parseInt(v, 10);
+  if(!Number.isFinite(n)) return fallback;
+  return Math.min(99, Math.max(1, n));
+}
+function isHexColor(v){ return typeof v === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v); }
+/* Sanitize anything coming from localStorage or an imported backup before it reaches the UI. */
+function normalizeSubject(raw, index){
+  if(!raw || typeof raw !== 'object') return null;
+  const name = typeof raw.name === 'string' ? raw.name.trim().slice(0, 120) : '';
+  if(!name) return null;
+  const target = clampTarget(raw.target, 75);
+  const color = isHexColor(raw.color) ? raw.color : subjectPresetColors[index % subjectPresetColors.length];
+  const records = {};
+  if(raw.records && typeof raw.records === 'object' && !Array.isArray(raw.records)){
+    Object.keys(raw.records).forEach(k=>{
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+      if(!Array.isArray(raw.records[k])) return;
+      const marks = raw.records[k].filter(v=> v === 'present' || v === 'absent');
+      if(marks.length) records[k] = marks;
+    });
+  }
+  const basePresent = Math.max(0, parseInt(raw.basePresent, 10) || 0);
+  const baseTotal = Math.max(basePresent, parseInt(raw.baseTotal, 10) || 0);
+  const safeId = (typeof raw.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(raw.id))
+    ? raw.id : 's' + Date.now() + '_' + index;
+  return { id: safeId, name, target, color, records, basePresent, baseTotal };
+}
+function normalizeState(raw){
+  const subjects = (raw && Array.isArray(raw.subjects)) ? raw.subjects.map(normalizeSubject).filter(Boolean) : [];
+  const seen = new Set();
+  subjects.forEach((s, i)=>{
+    while(seen.has(s.id)) s.id = 's' + Date.now() + '_' + i + '_' + seen.size;
+    seen.add(s.id);
+  });
+  return { subjects };
 }
 function dateKey(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 function todayStr(){ return dateKey(new Date()); }
@@ -1428,7 +1446,6 @@ function applySettings(){
   document.getElementById('reminderTimeRow').style.display = settings.reminderEnabled ? 'block' : 'none';
   document.getElementById('reminderTimeInput').value = settings.reminderTime || '18:00';
   document.getElementById('curReminder').textContent = settings.reminderEnabled ? `On · ${settings.reminderTime||'18:00'}` : 'Off';
-  if(typeof syncWidgetUI === 'function') syncWidgetUI();
 
   function setAccentAndRender(rgb){
     document.documentElement.style.setProperty('--accent', rgb);
@@ -1520,17 +1537,52 @@ accents.forEach(a=>{
 });
 function syncAccentDots(){ document.querySelectorAll('.accent-dot').forEach(d=> d.classList.toggle('active', d.dataset.name===settings.accent)); }
 
-/* ---------- Data export / import / reset ---------- */
-document.getElementById('exportBtn').onclick = ()=>{
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+/* ---------- File save/share: native plugins on Android, download on the web ---------- */
+function isNativeApp(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+function bytesToBase64(bytes){
+  let bin = '';
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){ bin += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk)); }
+  return btoa(bin);
+}
+function blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>{ const s = String(r.result || ''); const i = s.indexOf(','); resolve(i >= 0 ? s.slice(i+1) : ''); };
+    r.onerror = ()=> reject(r.error || new Error('read failed'));
+    r.readAsDataURL(blob);
+  });
+}
+function downloadOnWeb(filename, blob){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `attend-backup-${todayStr()}.json`;
+  a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('Backup downloaded');
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+async function saveFile(filename, data, mime){
+  const blob = (data instanceof Blob) ? data : new Blob([data], {type: mime || 'application/octet-stream'});
+  if(isNativeApp()){
+    const FS = window.Capacitor.Plugins.Filesystem;
+    const Share = window.Capacitor.Plugins.Share;
+    if(!FS) throw new Error('Filesystem plugin not available');
+    const base64 = await blobToBase64(blob);
+    const res = await FS.writeFile({ path: filename, data: base64, directory: 'CACHE', recursive: true });
+    if(Share){ await Share.share({ title: filename, files: [res.uri] }); }
+    else { showToast('Saved to app storage'); }
+    return;
+  }
+  downloadOnWeb(filename, blob);
+}
+
+/* ---------- Data export / import / reset ---------- */
+document.getElementById('exportBtn').onclick = async ()=>{
+  try{
+    await saveFile(`attend-backup-${todayStr()}.json`, JSON.stringify(state, null, 2), 'application/json');
+    if(!isNativeApp()) showToast('Backup downloaded');
+  }catch(err){ alert('Could not export the backup: ' + (err && err.message ? err.message : err)); }
 };
-document.getElementById('exportCsvBtn').onclick = ()=>{
+document.getElementById('exportCsvBtn').onclick = async ()=>{
   const rows = [['Subject','Present','Total','Percentage','Target %']];
   state.subjects.forEach(s=>{
     const t = totals(s);
@@ -1541,15 +1593,12 @@ document.getElementById('exportCsvBtn').onclick = ()=>{
     const str = String(cell);
     return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str;
   }).join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `attend-report-${todayStr()}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('CSV downloaded');
+  try{
+    await saveFile(`attend-report-${todayStr()}.csv`, '\uFEFF' + csv, 'text/csv');
+    if(!isNativeApp()) showToast('CSV downloaded');
+  }catch(err){ alert('Could not export CSV: ' + (err && err.message ? err.message : err)); }
 };
-document.getElementById('exportPdfBtn').onclick = ()=>{
+document.getElementById('exportPdfBtn').onclick = async ()=>{
   try{
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -1570,11 +1619,11 @@ document.getElementById('exportPdfBtn').onclick = ()=>{
       doc.text(String(s.target) + '%', 180, y);
       y += 8;
     });
-    doc.save(`attend-report-${todayStr()}.pdf`);
-    showToast('PDF downloaded');
-  }catch(err){ alert('Could not generate PDF. Check your internet connection (library failed to load).'); }
+    await saveFile(`attend-report-${todayStr()}.pdf`, doc.output('blob'), 'application/pdf');
+    if(!isNativeApp()) showToast('PDF downloaded');
+  }catch(err){ alert('Could not generate PDF: ' + (err && err.message ? err.message : err)); }
 };
-document.getElementById('exportXlsxBtn').onclick = ()=>{
+document.getElementById('exportXlsxBtn').onclick = async ()=>{
   try{
     const rows = state.subjects.map(s=>{
       const t = totals(s);
@@ -1584,9 +1633,10 @@ document.getElementById('exportXlsxBtn').onclick = ()=>{
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
-    XLSX.writeFile(wb, `attend-report-${todayStr()}.xlsx`);
-    showToast('Excel file downloaded');
-  }catch(err){ alert('Could not generate Excel file. Check your internet connection (library failed to load).'); }
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    await saveFile(`attend-report-${todayStr()}.xlsx`, new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    if(!isNativeApp()) showToast('Excel file downloaded');
+  }catch(err){ alert('Could not generate Excel file: ' + (err && err.message ? err.message : err)); }
 };
 document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
 document.getElementById('importInput').onchange = (e)=>{
@@ -1595,19 +1645,25 @@ document.getElementById('importInput').onchange = (e)=>{
   reader.onload = ()=>{
     try{
       const parsed = JSON.parse(reader.result);
-      if(parsed && Array.isArray(parsed.subjects)){
-        state = parsed; save(); renderAll();
-        showToast('Data imported');
-      } else { alert('That file doesn\'t look like an Attend backup.'); }
-    }catch(err){ alert('Could not read that file.'); }
+      if(!parsed || !Array.isArray(parsed.subjects)) throw new Error('bad shape');
+      const normalized = normalizeState(parsed);
+      if(parsed.subjects.length > 0 && normalized.subjects.length === 0){
+        alert('That backup has no valid subjects. Nothing was imported.');
+        return;
+      }
+      state = normalized; save(); renderAll();
+      const dropped = parsed.subjects.length - normalized.subjects.length;
+      showToast(dropped > 0 ? `Imported ${normalized.subjects.length} subjects (${dropped} invalid skipped)` : 'Data imported');
+    }catch(err){ alert('Could not read that file as an Attendance backup.'); }
+    finally { e.target.value = ''; }
   };
   reader.readAsText(file);
 };
 document.getElementById('resetBtn').onclick = ()=>{
-  if(confirm('Delete all subjects and attendance data? This can\'t be undone unless you exported a backup.')){
+  showConfirm('Reset everything?', "Delete all subjects and attendance data? This can't be undone unless you exported a backup.", ()=>{
     state = { subjects: [] }; save(); renderAll();
     showToast('All data cleared');
-  }
+  });
 };
 
 /* ---------- Reminders ---------- */
@@ -1618,120 +1674,6 @@ document.getElementById('reminderOnChip').onclick = ()=>{
 };
 document.getElementById('reminderTimeInput').onchange = (e)=>{ settings.reminderTime = e.target.value || '18:00'; save(); applySettings(); haptic(H.select); };
 
-/* ---------- Home Screen Widget sync ---------- */
-function genSyncId(){
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let id = '';
-  for(let i=0;i<10;i++) id += chars[Math.floor(Math.random()*chars.length)];
-  return id;
-}
-function widgetSyncUrl(){
-  if(!settings.widgetSyncId) return '';
-  return `${location.origin}/.netlify/functions/sync?id=${settings.widgetSyncId}`;
-}
-function syncWidgetUI(){
-  document.getElementById('widgetSyncOffChip').classList.toggle('active', !settings.widgetSyncEnabled);
-  document.getElementById('widgetSyncOnChip').classList.toggle('active', !!settings.widgetSyncEnabled);
-  document.getElementById('widgetSyncDetails').style.display = settings.widgetSyncEnabled ? 'block' : 'none';
-  document.getElementById('curWidgetSync').textContent = settings.widgetSyncEnabled ? 'On' : 'Off';
-  document.getElementById('widgetSyncUrl').value = widgetSyncUrl();
-}
-document.getElementById('widgetSyncOffChip').onclick = ()=>{ settings.widgetSyncEnabled = false; save(); syncWidgetUI(); haptic(H.toggle); };
-document.getElementById('widgetSyncOnChip').onclick = ()=>{
-  if(!settings.widgetSyncId) settings.widgetSyncId = genSyncId();
-  settings.widgetSyncEnabled = true; save(); syncWidgetUI(); haptic(H.toggle);
-  pushWidgetSync();
-};
-document.getElementById('widgetSyncRegen').onclick = ()=>{
-  settings.widgetSyncId = genSyncId(); save(); syncWidgetUI(); haptic(H.select);
-  pushWidgetSync();
-  showToast('New sync link generated');
-};
-document.getElementById('widgetSyncCopy').onclick = ()=>{
-  const url = widgetSyncUrl();
-  if(!url) return;
-  navigator.clipboard && navigator.clipboard.writeText(url).then(()=> showToast('Link copied')).catch(()=>{});
-  haptic(H.select);
-};
-document.getElementById('widgetSyncCopyScript').onclick = ()=>{
-  const script = `// Attendance Widget — paste this whole file into a new Scriptable script
-const SYNC_URL = "${widgetSyncUrl()}";
-
-async function run() {
-  let data = null;
-  try {
-    const req = new Request(SYNC_URL);
-    data = await req.loadJSON();
-  } catch (e) {}
-  const w = new ListWidget();
-  w.backgroundColor = new Color("#141518");
-  w.setPadding(14, 14, 14, 14);
-
-  const title = w.addText("Attendance");
-  title.font = Font.semiboldSystemFont(13);
-  title.textColor = new Color("#ff6e6e");
-  w.addSpacer(6);
-
-  if (!data || data.overallPct === null || data.overallPct === undefined) {
-    const empty = w.addText("No data yet");
-    empty.font = Font.systemFont(14);
-    empty.textColor = Color.gray();
-  } else {
-    const pct = w.addText(data.overallPct + "%");
-    pct.font = Font.boldSystemFont(34);
-    pct.textColor = Color.white();
-    w.addSpacer(8);
-    (data.subjects || []).slice(0, 4).forEach(s => {
-      const row = w.addStack();
-      row.centerAlignContent();
-      const dot = row.addText("\\u25CF ");
-      dot.textColor = new Color(s.color || "#ff6e6e");
-      dot.font = Font.systemFont(11);
-      const name = row.addText(s.name);
-      name.font = Font.systemFont(12);
-      name.textColor = Color.white();
-      row.addSpacer();
-      const pctText = row.addText(s.pct === null ? "\\u2014" : s.pct + "%");
-      pctText.font = Font.semiboldSystemFont(12);
-      pctText.textColor = Color.lightGray();
-      w.addSpacer(4);
-    });
-  }
-  return w;
-}
-
-const widget = await run();
-if (config.runsInWidget) {
-  Script.setWidget(widget);
-} else {
-  widget.presentSmall();
-}
-Script.complete();
-`;
-  navigator.clipboard && navigator.clipboard.writeText(script).then(()=> showToast('Scriptable script copied — paste into a new script')).catch(()=> showToast('Could not copy — clipboard blocked'));
-  haptic(H.select);
-};
-let widgetSyncTimer = null;
-function pushWidgetSync(){
-  if(!settings.widgetSyncEnabled || !settings.widgetSyncId) return;
-  clearTimeout(widgetSyncTimer);
-  widgetSyncTimer = setTimeout(()=>{
-    const payload = {
-      overallPct: (()=>{
-        let p=0,t=0; state.subjects.forEach(s=>{ const tt=totals(s); p+=tt.present; t+=tt.total; });
-        return t ? Math.round((p/t)*100) : null;
-      })(),
-      subjects: state.subjects.map(s=>{
-        const t = totals(s);
-        return { name: s.name, pct: t.total ? Math.round((t.present/t.total)*100) : null, color: s.color || '#ff6e6e' };
-      }),
-    };
-    if(typeof fetch !== 'function') return;
-    fetch(`/.netlify/functions/sync?id=${settings.widgetSyncId}`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
-    }).catch(()=>{});
-  }, 1500);
-}
 function checkReminder(){
   // Native Android uses Capacitor Local Notifications; never emit duplicate web notifications.
   if(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return;
@@ -1900,8 +1842,9 @@ function calcPct(subject){
 function bunkInfo(s){
   const t = totals(s);
   const total = t.total, present = t.present;
-  const T = s.target/100;
-  if(total<=0) return { has:false };
+  const target = Math.min(99, Math.max(1, Number(s.target) || 75));
+  const T = target/100;
+  if(total<=0 || present < 0 || total < present) return { has:false };
   const currentPct = present/total;
   if(currentPct >= T){
     const maxAbsences = Math.max(0, Math.floor(present/T - total));
@@ -2851,12 +2794,22 @@ function attachSwipe(card, id){
     card.style.transform = 'translateX(0)';
     leftHint.style.opacity=0; rightHint.style.opacity=0;
   }
-  card.addEventListener('touchstart', e=> onStart(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
-  card.addEventListener('touchmove', e=> onMove(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
-  card.addEventListener('touchend', onEnd);
-  card.addEventListener('mousedown', e=> onStart(e.clientX, e.clientY));
-  window.addEventListener('mousemove', e=> { if(dragging) onMove(e.clientX, e.clientY); });
-  window.addEventListener('mouseup', onEnd);
+  function cancel(){
+    if(!dragging) return;
+    dragging = false; dx = 0;
+    card.style.transition=`transform var(--duration-spring) var(--ease-standard)`;
+    card.style.transform = 'translateX(0)';
+    leftHint.style.opacity=0; rightHint.style.opacity=0;
+  }
+  card.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.action-btn')) return;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    onStart(e.clientX, e.clientY);
+    try{ card.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  card.addEventListener('pointermove', e=> onMove(e.clientX, e.clientY));
+  card.addEventListener('pointerup', onEnd);
+  card.addEventListener('pointercancel', cancel);
 }
 
 /* ---------- Add subject modal ---------- */
@@ -2885,7 +2838,7 @@ document.getElementById('addFab').onclick = openAddOverlay;
 document.getElementById('cancelAdd').onclick = ()=>{ document.getElementById('addOverlay').classList.remove('open'); stackRemove('addOverlay'); haptic(H.close); };
 document.getElementById('confirmAdd').onclick = ()=>{
   const name = document.getElementById('newSubjectName').value.trim();
-  const target = parseInt(document.getElementById('newSubjectTarget').value) || 75;
+  const target = clampTarget(document.getElementById('newSubjectTarget').value, 75);
   if(!name) return;
   const present = Math.max(0, parseInt(document.getElementById('newSubjectPresent').value) || 0);
   const total = Math.max(present, parseInt(document.getElementById('newSubjectTotal').value) || 0);
@@ -2995,13 +2948,13 @@ document.getElementById('confirmEdit').onclick = ()=>{
   const s = state.subjects.find(x=>x.id===editingId); if(!s) return;
   const name = document.getElementById('editSubjectName').value.trim();
   if(!name){ alert('Subject name can\'t be empty.'); return; }
-  const target = parseInt(document.getElementById('editSubjectTarget').value) || s.target;
-  const newPresent = Math.max(0, parseInt(document.getElementById('editPresentCount').value) || 0);
-  const newTotal = Math.max(newPresent, parseInt(document.getElementById('editTotalCount').value) || 0);
+  const target = clampTarget(document.getElementById('editSubjectTarget').value, s.target);
 
   const vals = flatVals(s);
   const recordPresent = vals.filter(v=>v==='present').length;
   const recordTotal = vals.length;
+  const newPresent = Math.max(0, parseInt(document.getElementById('editPresentCount').value) || 0, recordPresent);
+  const newTotal = Math.max(0, parseInt(document.getElementById('editTotalCount').value) || 0, recordTotal, newPresent);
 
   s.name = name;
   s.target = target;
@@ -3239,18 +3192,12 @@ function shareWeeklyRecap(range, curPct, prevPct){
   ctx.fillStyle='rgba(255,255,255,0.25)';
   ctx.font='400 16px -apple-system, sans-serif';
   ctx.fillText('Attendance', 50, H-40);
-  canvas.toBlob(blob=>{
-    const file = new File([blob], `weekly-recap-${todayStr()}.png`, {type:'image/png'});
-    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
-      navigator.share({files:[file], title:'Weekly Recap'}).catch(()=>{});
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href=url; a.download=file.name;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Recap image downloaded');
-    }
+  canvas.toBlob(async blob=>{
+    if(!blob){ showToast("Couldn't generate the recap image"); return; }
+    try{
+      await saveFile(`weekly-recap-${todayStr()}.png`, blob, 'image/png');
+      if(!isNativeApp()) showToast('Recap image downloaded');
+    }catch(err){ showToast('Could not save the recap image'); }
   }, 'image/png');
   haptic(H.success);
 }
@@ -3589,11 +3536,6 @@ requestAnimationFrame(()=> moveLens(0));
   document.body.classList.add('is-native');
   const LN = C.Plugins && C.Plugins.LocalNotifications;
   const WB = C.Plugins && C.Plugins.WidgetBridge;
-
-  const g = document.getElementById('widgetGroup');
-  if(g){
-    g.innerHTML = '<div class="settings-group-title">Home Screen Widget</div><div class="card settings-block"><h3>Attendance widget</h3><p style="font-size:13px; opacity:0.7; line-height:1.6; margin:0;">Long-press an empty spot on your home screen &rarr; <b>Widgets</b> &rarr; <b>Attendance</b>. It updates automatically whenever you mark a class.</p></div>';
-  }
 
   function widgetPayload(){
     let p=0,t=0;
