@@ -3670,8 +3670,8 @@ requestAnimationFrame(()=> moveLens(0));
   const AISTUDIO='https://aistudio.google.com/apikey';
   const K_LAST='erp_last_sync', K_KEY='gemini_key', K_MODEL='gemini_model';
   const DEFAULT_MODEL='gemini-2.5-flash';
-  const isNative=!!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
-  const IAB=window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.InAppBrowser;
+  const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const getIAB = () => window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.InAppBrowser;
   const lget=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
   const lset=(k,v)=>{ try{ (v===null||v==='') ? localStorage.removeItem(k) : localStorage.setItem(k,v); }catch(e){} };
   const $=id=>document.getElementById(id);
@@ -3883,7 +3883,8 @@ ${pageText}`;
 
   /* ---- One in-app browser for everything (ERP sync, search, any URL) ---- */
   async function launch(url,title){
-    if(!isNative||!IAB){ showToast('In-app browser works only in the Android app'); return; }
+    const IAB = getIAB();
+    if(!isNative()||!IAB){ showToast('In-app browser works only in the Android app'); return; }
     const site=activeSite();
     let busy=false;
     const l0=await IAB.addListener('messageFromWebview', async ev=>{
@@ -3916,7 +3917,8 @@ ${pageText}`;
 
   /* ERP sync: opens the user's own saved ERP address */
   async function open(){
-    if(!isNative||!IAB){ showToast('ERP sync works only in the Android app'); return; }
+    const IAB = getIAB();
+    if(!isNative()||!IAB){ showToast('ERP sync works only in the Android app'); return; }
     if(!lget(K_KEY)){ openGuide(); showToast('Add your Gemini API key first'); return; }
     const site=activeSite();
     if(!site){ showToast('Save your ERP website address first'); return; }
@@ -3931,7 +3933,7 @@ ${pageText}`;
   /* ---- Guide + key UI ---- */
   function openGuide(){ $('geminiGuideOverlay').classList.add('open'); stackPush('geminiGuideOverlay',()=>$('geminiGuideOverlay').classList.remove('open')); }
   function closeGuide(){ $('geminiGuideOverlay').classList.remove('open'); stackRemove('geminiGuideOverlay'); }
-  function openLink(url){ if(isNative&&IAB){ launch(url,'Google AI Studio'); } else window.open(url,'_blank'); }
+  function openLink(url){ if(isNative()&&getIAB()){ launch(url,'Google AI Studio'); } else window.open(url,'_blank'); }
   $('geminiGuideBtn').onclick=openGuide;
   $('guideClose').onclick=closeGuide;
   $('guideOpen').onclick=()=>openLink(AISTUDIO);
