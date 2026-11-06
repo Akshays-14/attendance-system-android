@@ -1686,7 +1686,7 @@ document.getElementById('reminderOnChip').onclick = ()=>{
 const reminderHour = document.getElementById('reminderHourInput');
 const reminderMinute = document.getElementById('reminderMinuteInput');
 for(let hour=0;hour<24;hour++){ const option=document.createElement('option'); option.value=String(hour).padStart(2,'0'); option.textContent=option.value; reminderHour.appendChild(option); }
-for(let minute=0;minute<60;minute+=5){ const option=document.createElement('option'); option.value=String(minute).padStart(2,'0'); option.textContent=option.value; reminderMinute.appendChild(option); }
+for(let minute=0;minute<60;minute++){ const option=document.createElement('option'); option.value=String(minute).padStart(2,'0'); option.textContent=option.value; reminderMinute.appendChild(option); }
 function saveReminderTime(){ settings.reminderTime = reminderHour.value + ':' + reminderMinute.value; save(); applySettings(); haptic(H.select); }
 reminderHour.onchange = saveReminderTime;
 reminderMinute.onchange = saveReminderTime;
