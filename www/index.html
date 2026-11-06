@@ -97,7 +97,7 @@ body.font-squared .action-btn, body.font-squared .btn{ font-family:'Space Mono',
 .app{
   max-width:480px;
   margin:0 auto;
-  padding:calc(env(safe-area-inset-top,0px) + 20px) 16px 120px;
+  padding:calc(env(safe-area-inset-top,0px) + 20px) 16px calc(200px + env(safe-area-inset-bottom,0px));
   min-height:100vh;
 }
 .view{ display:none; }
@@ -491,6 +491,11 @@ body.ui-skeu .fab{
   box-shadow:6px 6px 14px rgba(0,0,0,0.5), -5px -5px 12px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 
+.reminder-time-controls{display:flex;align-items:center;gap:8px;max-width:180px;}
+.reminder-time-select{flex:1;min-width:0;margin:0;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgb(var(--text));font:700 16px inherit;text-align:center;appearance:none;-webkit-appearance:none;}
+body.ui-normal .reminder-time-select{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.14);}
+body.ui-skeu.tone-light .reminder-time-select{background:rgba(0,0,0,0.05);border-color:rgba(0,0,0,0.12);color:rgb(var(--text));}
+.reminder-time-separator{font-weight:800;opacity:.65;}
 .navbar{ position:fixed; left:0; right:0; bottom:0; z-index:30; padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); display:flex; justify-content:center; }
 .navbar-inner{
   width:100%; max-width:480px; display:flex; position:relative; border-radius:24px; padding:6px; gap:4px;
@@ -901,7 +906,11 @@ select{ width:100%; padding:12px; border-radius:14px; border:1px solid rgba(255,
         </div>
         <div id="reminderTimeRow" style="display:none; margin-top:12px;">
           <div class="setting-label" style="margin-top:0;"><span>Remind me at</span></div>
-          <input type="time" id="reminderTimeInput" style="margin-bottom:0;">
+          <div class="reminder-time-controls">
+            <select id="reminderHourInput" class="reminder-time-select" aria-label="Reminder hour"></select>
+            <span class="reminder-time-separator">:</span>
+            <select id="reminderMinuteInput" class="reminder-time-select" aria-label="Reminder minute"></select>
+          </div>
         </div>
       </div>
     </div>
@@ -1444,7 +1453,9 @@ function applySettings(){
   document.getElementById('reminderOffChip').classList.toggle('active', !settings.reminderEnabled);
   document.getElementById('reminderOnChip').classList.toggle('active', !!settings.reminderEnabled);
   document.getElementById('reminderTimeRow').style.display = settings.reminderEnabled ? 'block' : 'none';
-  document.getElementById('reminderTimeInput').value = settings.reminderTime || '18:00';
+  const reminderParts = (settings.reminderTime || '18:00').split(':');
+  document.getElementById('reminderHourInput').value = reminderParts[0] || '18';
+  document.getElementById('reminderMinuteInput').value = reminderParts[1] || '00';
   document.getElementById('curReminder').textContent = settings.reminderEnabled ? `On · ${settings.reminderTime||'18:00'}` : 'Off';
 
   function setAccentAndRender(rgb){
@@ -1672,7 +1683,13 @@ document.getElementById('reminderOnChip').onclick = ()=>{
   settings.reminderEnabled = true; save(); applySettings(); haptic(H.toggle);
   if(!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && 'Notification' in window && Notification.permission === 'default'){ Notification.requestPermission(); }
 };
-document.getElementById('reminderTimeInput').onchange = (e)=>{ settings.reminderTime = e.target.value || '18:00'; save(); applySettings(); haptic(H.select); };
+const reminderHour = document.getElementById('reminderHourInput');
+const reminderMinute = document.getElementById('reminderMinuteInput');
+for(let hour=0;hour<24;hour++){ const option=document.createElement('option'); option.value=String(hour).padStart(2,'0'); option.textContent=option.value; reminderHour.appendChild(option); }
+for(let minute=0;minute<60;minute+=5){ const option=document.createElement('option'); option.value=String(minute).padStart(2,'0'); option.textContent=option.value; reminderMinute.appendChild(option); }
+function saveReminderTime(){ settings.reminderTime = reminderHour.value + ':' + reminderMinute.value; save(); applySettings(); haptic(H.select); }
+reminderHour.onchange = saveReminderTime;
+reminderMinute.onchange = saveReminderTime;
 
 function checkReminder(){
   // Native Android uses Capacitor Local Notifications; never emit duplicate web notifications.
