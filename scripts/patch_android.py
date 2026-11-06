@@ -23,7 +23,7 @@ mpath = os.path.join(MAIN, "AndroidManifest.xml")
 m = open(mpath, encoding="utf8").read()
 if "AttendanceWidgetProvider" not in m:
     receiver = """
-        <receiver android:name=".AttendanceWidgetProvider" android:exported="false">
+        <receiver android:name=".AttendanceWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
