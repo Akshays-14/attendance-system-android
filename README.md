@@ -71,7 +71,7 @@ app with no build step.
 - Reminder delivery depends on Android/OEM battery management. On aggressive OEMs (for
   example OPPO/Realme), set battery usage to **Unrestricted** and allow auto-launch.
 - Reminders are scheduled for a rolling 14-day window when the app runs. Reopen the app
-  periodically to replenish the window. A force-stop or reboot can affect pending deliveries.
+  periodically to replenish the window. A force-stop or reboot can affect pending deliveries
 - The launcher controls widget refresh cadence; the widget also refreshes when the app writes data.
 - The UI is one large `www/index.html` file. It works, but it is the main thing to refactor if
   you want to contribute substantially.
