@@ -1,5 +1,5 @@
 # Attendance
-
+Test
 A local-first attendance tracker for students, packaged as a PWA and an Android app with
 [Capacitor](https://capacitorjs.com/). It answers one question well: **how many classes can I
 skip, or how many do I need to attend, to stay above my target?**
